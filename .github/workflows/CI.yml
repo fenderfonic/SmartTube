@@ -7,6 +7,8 @@ on:
 
 jobs:
   build:
+    # Avoid unsigned upstream release artifacts in the fork.
+    if: github.repository == 'yuliskov/SmartTube'
     runs-on: ubuntu-latest
     env:
       HAS_SIGNING_KEY: ${{ secrets.SIGNING_KEY != '' }}
