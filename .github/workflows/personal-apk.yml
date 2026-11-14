@@ -1,7 +1,7 @@
 name: Personal Android TV test APK
 on:
   pull_request:
-    branches: [master]
+    branches: [master, feat/discover-self-drive]
   push:
     branches: [master]
   workflow_dispatch:
@@ -23,6 +23,10 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: gradle
+      - name: Verify Discover curator
+        run: python3 -m unittest discover -s curator/tests -v
+      - name: Verify Discover Android selection and cache
+        run: bash gradlew --no-daemon :common:testStbetaDebugUnitTest --tests '*Discovery*Test'
       - name: Build test APK
         run: |
           chmod +x gradlew

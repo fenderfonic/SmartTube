@@ -1,0 +1,12 @@
+[Unit]
+Description=Private read-only adnada Discover pool
+[Service]
+WorkingDirectory=%h/adnada-discover/SmartTube/curator
+EnvironmentFile=%h/.config/adnada-discover/environment
+ExecStart=/usr/bin/python3 serve.py --bind ${DISCOVER_BIND} --pool %h/.local/state/adnada-discover/pool.json
+Restart=on-failure
+RestartSec=10
+UMask=0077
+NoNewPrivileges=true
+[Install]
+WantedBy=default.target

@@ -2,256 +2,158 @@ package com.liskovsoft.smartyoutubetv2.common.app.presenters;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-
+import android.util.Base64;
+import com.liskovsoft.mediaserviceinterfaces.oauth.Account;
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsItem;
-
+import com.liskovsoft.smartyoutubetv2.common.app.models.discover.DiscoveryPool;
+import com.liskovsoft.smartyoutubetv2.common.app.models.discover.DiscoveryRepository;
+import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem;
+import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
+import com.liskovsoft.smartyoutubetv2.common.utils.SimpleEditDialog;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Random;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
-/**
- * A deliberately small, local-only exploration shelf.
- *
- * No user behaviour is collected from playback or clicks as a preference.
- * Only explicit positive/negative feedback changes topic weights.
- * YouTube is used for search results, never for generating this shelf.
- *
- * Later, a private owner-operated service may provide fresh query suggestions
- * without placing third-party API keys in this Android application.
- */
+/** Native search shelf. Only explicit thumbs change preferences; no playback hooks. */
 public final class DiscoverPresenter {
-    // MediaGroup built-in section IDs currently end at 22.
     public static final int SECTION_ID = 23;
-
-    private static final String PREFS = "adnada_discover";
-    private static final String LAST_TOPIC = "last_topic";
-    private static final String RECENT_QUERIES = "recent_queries";
-    private static final int RECENT_LIMIT = 48;
-    private static final int DISPLAY_COUNT = 8;
-    private static final Random RANDOM = new Random();
-
-    // Independently curated search directions; no personal watch history or
-    // existing recommendation categories are used to generate these.
-    private static final String[][] TOPICS = {
-        {"Engineering",
-            "Fred Dibnah steam engineering and industrial heritage documentary",
-            "How mechanical clocks are restored by expert craftsmen",
-            "The engineering of historical bridges explained",
-            "How early computers were built by hand"},
-        {"History",
-            "Forgotten cities recovered by archaeologists documentary",
-            "How ordinary people lived in medieval cities",
-            "The history of navigation before GPS explained",
-            "How historians reconstruct ancient trade routes"},
-        {"Music",
-            "Unusual instruments and how they work documentary",
-            "Traditional music traditions around the world explained",
-            "The craft of building a pipe organ documentary",
-            "Early electronic music pioneers documentary"},
-        {"Science",
-            "Beautiful experiments that changed physics",
-            "How scientists discovered the age of Earth",
-            "The strange physics of everyday materials",
-            "Unsolved questions in ocean science explained"},
-        {"Craft",
-            "Master craftsperson restoring old tools documentary",
-            "Traditional Japanese woodworking techniques explained",
-            "How stained glass windows are made by hand",
-            "Forgotten industrial crafts and techniques"},
-        {"Language",
-            "How linguists decipher unknown scripts",
-            "Languages that developed extraordinary writing systems",
-            "Why different languages describe colours differently",
-            "The history of constructed languages explained"},
-        {"Architecture",
-            "Vernacular architecture adapted to extreme climates",
-            "The engineering behind ancient aqueducts",
-            "How cathedral builders solved structural problems",
-            "Brutalist architecture explained by architects"},
-        {"Mathematics",
-            "Unexpected uses of number theory explained",
-            "Beautiful mathematics visual proofs",
-            "How people measured the Earth before satellites",
-            "The mathematics behind musical harmony"},
-        {"Medicine",
-            "Medical discoveries made by accident history",
-            "How the human immune system was discovered",
-            "The history of medical imaging explained",
-            "What medical historians learn from ancient skeletons"},
-        {"Geography",
-            "The world's most unusual geological formations explained",
-            "How ancient maps changed exploration",
-            "Why cities are built where they are geography",
-            "How rivers reshape continents documentary"},
-        {"Space",
-            "Forgotten robotic space missions documentary",
-            "How radio astronomers observe invisible galaxies",
-            "What spacecraft engineering learned from early failures",
-            "The history of planetary mapping explained"},
-        {"Biology",
-            "Extraordinary animal adaptations explained by scientists",
-            "How mushrooms communicate with ecosystems",
-            "The evolution of unusual senses in animals",
-            "How natural history museums preserve specimens"},
-        {"Computing",
-            "History of early home computing pioneers documentary",
-            "How analogue computers actually worked",
-            "The story of forgotten operating systems",
-            "Old computer restoration and reverse engineering"},
-        {"Art",
-            "How conservators restore Renaissance paintings",
-            "Forgotten art movements explained documentary",
-            "How pigments were made in the ancient world",
-            "Artists using mathematics and geometry"},
-        {"Food",
-            "Traditional food preservation methods around the world",
-            "How fermentation works microbiology documentary",
-            "The cultural history of bread making",
-            "History of spices and global trade routes"},
-        {"People",
-            "Unknown inventors who changed everyday life",
-            "Remarkable oral histories from working people",
-            "The lives of overlooked women scientists",
-            "History of independent documentary filmmakers"},
-        {"Ocean",
-            "Deep sea exploration unexpected discoveries documentary",
-            "How underwater archaeology works",
-            "Strange deep ocean ecosystems scientists",
-            "The engineering of historical diving equipment"},
-        {"Transport",
-            "History of airship engineering documentary",
-            "How narrow gauge mountain railways work",
-            "Unusual maritime engineering innovations",
-            "The history of bicycle design explained"},
-        {"Culture",
-            "Forgotten festivals and their origins documentary",
-            "How traditional games developed around the world",
-            "The history of everyday objects museum documentary",
-            "Cultural history of public libraries documentary"},
-        {"Ideas",
-            "How scientific ideas spread before the internet",
-            "History of measurement and standard units",
-            "Unexpected connections between archaeology and astronomy",
-            "Experiments that overturned accepted beliefs"}
-    };
-
     private DiscoverPresenter() {}
 
+    static String accountKey() {
+        Account a = MediaServiceManager.instance().getSelectedAccount();
+        if (a == null || a.isEmpty()) return "anonymous";
+        try {
+            String identity = a.getId() + "\n" + a.getEmail() + "\n" + a.getName();
+            return Base64.encodeToString(MessageDigest.getInstance("SHA-256").digest(
+                    identity.getBytes(StandardCharsets.UTF_8)), Base64.URL_SAFE | Base64.NO_WRAP);
+        } catch (Exception error) { throw new IllegalStateException(error); }
+    }
+
+    private static SharedPreferences prefs(Context context, String account) {
+        return context.getSharedPreferences("adnada_discover_v2_" + account, Context.MODE_PRIVATE);
+    }
+
+    private static void add(List<SettingsItem> items, Context context, String account, String label, Runnable action) {
+        items.add(new SettingsItem(label, () -> {
+            if (account.equals(accountKey())) action.run();
+            else refresh(context); // Ignore callbacks left over from another account's screen.
+        }));
+    }
+
     public static List<SettingsItem> items(Context context) {
-        SharedPreferences prefs = prefs(context);
-        List<String> recentlyShown = readRecent(prefs);
-        List<Choice> candidates = new ArrayList<>();
-        for (int topic = 0; topic < TOPICS.length; topic++) {
-            int weight = prefs.getInt("weight_" + topic, 0);
-            if (weight <= -3) {
-                continue;
-            }
-            for (int query = 1; query < TOPICS[topic].length; query++) {
-                String text = TOPICS[topic][query];
-                // Explicit feedback is a slight nudge, not a gravity well.
-                double score = RANDOM.nextDouble() + weight * 0.075;
-                if (recentlyShown.contains(text)) {
-                    score -= 2.0;
-                }
-                candidates.add(new Choice(topic, text, score));
-            }
-        }
-        // If every subject was explicitly downvoted, recover with all subjects.
-        if (candidates.isEmpty()) {
-            for (int topic = 0; topic < TOPICS.length; topic++) {
-                for (int q = 1; q < TOPICS[topic].length; q++) {
-                    candidates.add(new Choice(topic, TOPICS[topic][q], RANDOM.nextDouble()));
-                }
-            }
-        }
-
-        Collections.sort(candidates, (first, second) -> Double.compare(second.score, first.score));
-        List<Choice> picked = new ArrayList<>();
-        boolean[] usedTopics = new boolean[TOPICS.length];
-        for (Choice candidate : candidates) {
-            if (!usedTopics[candidate.topic]) {
-                usedTopics[candidate.topic] = true;
-                picked.add(candidate);
-                if (picked.size() == DISPLAY_COUNT) break;
-            }
-        }
-
+        Context app = context.getApplicationContext();
+        String account = accountKey();
+        SharedPreferences p = prefs(app, account);
+        DiscoveryPool pool = DiscoveryRepository.load(app);
+        DiscoveryRepository.fetch(app, false, null);
+        Set<String> recent = new HashSet<>(Arrays.asList(p.getString("recent", "").split("\n")));
+        Map<String, Integer> weights = new HashMap<>();
+        for (DiscoveryPool.Entry e : pool.entries) weights.put(e.topic, p.getInt("weight_" + e.topic, 0));
+        long turn = p.getLong("turn", 0);
+        List<DiscoveryPool.Entry> selected = pool.select(turn, weights, recent,
+                p.getString("focus_topic", ""), p.getString("focus_region", ""));
         List<SettingsItem> result = new ArrayList<>();
-        result.add(new SettingsItem("Pivot — give me different directions", () -> {
-            BrowsePresenter.instance(context).refresh(false);
-        }));
-
-        if (prefs.contains(LAST_TOPIC)) {
-            result.add(new SettingsItem("👍 Worth exploring — more variety like that", () -> {
-                adjustLastTopic(context, 1);
-            }));
-            result.add(new SettingsItem("👎 Not my thing — less of that", () -> {
-                adjustLastTopic(context, -1);
-            }));
+        add(result, context, account, "Pivot · twelve different directions", () -> refresh(context));
+        add(result, context, account, "Focus · subject or region", () -> focus(context, account, pool));
+        add(result, context, account, "Explore · clear Focus", () -> {
+            p.edit().remove("focus_topic").remove("focus_region").apply();
+            refresh(context);
+        });
+        String last = p.getString("last_topic", "");
+        if (!last.isEmpty()) {
+            add(result, context, account, "👍 Worth exploring · " + last, () -> feedback(context, p, last, 1));
+            add(result, context, account, "👎 Less of this · " + last, () -> feedback(context, p, last, -1));
+            add(result, context, account, "Focus · last subject: " + last, () -> {
+                p.edit().putString("focus_topic", last).apply();
+                refresh(context);
+            });
         }
-
-        result.add(new SettingsItem("Reset my discovery preferences", () -> {
-            // Only discovery preferences are cleared, never SmartTube history.
-            prefs.edit().clear().apply();
-            MessageHelpers.showMessage(context, "Discovery preferences reset");
-            BrowsePresenter.instance(context).refresh(false);
-        }));
-
-        for (Choice choice : picked) {
-            result.add(new SettingsItem("Explore · " + choice.query, () -> {
-                prefs.edit().putInt(LAST_TOPIC, choice.topic).apply();
-                SearchPresenter.instance(context).startSearch(choice.query);
-            }));
-            recentlyShown.add(choice.query);
+        for (DiscoveryPool.Entry e : selected) {
+            add(result, context, account, "Explore · " + e.topic + " · " + e.query, () -> {
+                // Selection only names the explicit feedback target. It never alters weights.
+                p.edit().putString("last_topic", e.topic).apply();
+                SearchPresenter.instance(context).startSearch(e.query);
+            });
         }
-        writeRecent(prefs, recentlyShown);
+        add(result, context, account, "Pool · " + pool.revision + " · private host settings", () -> endpoint(context));
+        add(result, context, account, "Refresh pool from host", () -> DiscoveryRepository.fetch(app, true,
+                () -> MessageHelpers.showMessage(app, "Pool refresh finished; Pivot to use cached results")));
+        add(result, context, account, "Reset this account's discovery preferences", () -> {
+            p.edit().clear().apply();
+            refresh(context);
+        });
+        List<String> history = new ArrayList<>(Arrays.asList(p.getString("recent", "").split("\n")));
+        for (DiscoveryPool.Entry e : selected) history.add(e.query);
+        int from = Math.max(0, history.size() - 96);
+        StringBuilder stored = new StringBuilder();
+        for (String query : history.subList(from, history.size())) {
+            if (stored.length() > 0) stored.append('\n');
+            stored.append(query);
+        }
+        p.edit().putLong("turn", turn + 1).putString("recent", stored.toString()).apply();
         return result;
     }
 
-    private static void adjustLastTopic(Context context, int step) {
-        SharedPreferences prefs = prefs(context);
-        int topic = prefs.getInt(LAST_TOPIC, -1);
-        if (topic < 0 || topic >= TOPICS.length) return;
-        int oldWeight = prefs.getInt("weight_" + topic, 0);
-        int weight = Math.max(-3, Math.min(3, oldWeight + step));
-        prefs.edit().putInt("weight_" + topic, weight).apply();
-        MessageHelpers.showMessage(context, step > 0
-                ? "Noted. More worthwhile discoveries, less repetition."
-                : "Noted. We'll move away from that direction.");
-        BrowsePresenter.instance(context).refresh(false);
+    private static void feedback(Context context, SharedPreferences p, String topic, int step) {
+        int weight = Math.max(-3, Math.min(3, p.getInt("weight_" + topic, 0) + step));
+        p.edit().putInt("weight_" + topic, weight).apply();
+        MessageHelpers.showMessage(context, "Noted for " + topic + "; unfamiliar directions remain reserved");
+        refresh(context);
     }
 
-    private static SharedPreferences prefs(Context context) {
-        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-    }
-
-    private static List<String> readRecent(SharedPreferences prefs) {
-        String raw = prefs.getString(RECENT_QUERIES, "");
-        return raw.isEmpty() ? new ArrayList<>() : new ArrayList<>(Arrays.asList(raw.split("\\n")));
-    }
-
-    private static void writeRecent(SharedPreferences prefs, List<String> recent) {
-        int from = Math.max(0, recent.size() - RECENT_LIMIT);
-        StringBuilder builder = new StringBuilder();
-        for (int i = from; i < recent.size(); i++) {
-            if (builder.length() > 0) builder.append('\n');
-            builder.append(recent.get(i));
+    private static void focus(Context context, String account, DiscoveryPool pool) {
+        SharedPreferences p = prefs(context, account);
+        AppDialogPresenter dialog = AppDialogPresenter.instance(context);
+        Set<String> topics = new TreeSet<>(), regions = new TreeSet<>();
+        for (DiscoveryPool.Entry e : pool.entries) { topics.add(e.topic); regions.add(e.region); }
+        for (String topic : topics) {
+            dialog.appendSingleButton(UiOptionItem.from("Subject · " + topic, option -> {
+                if (account.equals(accountKey())) p.edit().putString("focus_topic", topic).apply();
+                dialog.closeDialog();
+                refresh(context);
+            }));
         }
-        prefs.edit().putString(RECENT_QUERIES, builder.toString()).apply();
+        for (String region : regions) {
+            dialog.appendSingleButton(UiOptionItem.from("Region · " + region, option -> {
+                if (account.equals(accountKey())) p.edit().putString("focus_region", region).apply();
+                dialog.closeDialog();
+                refresh(context);
+            }));
+        }
+        dialog.showDialog("Focus · subjects and regions (combine them; Explore clears both)");
     }
 
-    private static final class Choice {
-        final int topic;
-        final String query;
-        final double score;
-        Choice(int topic, String query, double score) {
-            this.topic = topic;
-            this.query = query;
-            this.score = score;
-        }
+    private static void endpoint(Context context) {
+        SharedPreferences config = DiscoveryRepository.settings(context);
+        AppDialogPresenter dialog = AppDialogPresenter.instance(context);
+        dialog.appendSingleButton(UiOptionItem.from("Set private host URL", option -> {
+            dialog.closeDialog();
+            SimpleEditDialog.show(context, "http://192.168.x.x:8766/pool.json",
+                    config.getString("endpoint", "http://192.168.1.2:8766/pool.json"), value -> {
+                        String url = value.trim();
+                        if (!DiscoveryRepository.validEndpoint(url)) {
+                            MessageHelpers.showMessage(context, "Use a private IPv4 HTTP address and /pool.json");
+                            return false;
+                        }
+                        config.edit().putString("endpoint", url).apply();
+                        DiscoveryRepository.fetch(context.getApplicationContext(), true, null);
+                        return true;
+                    });
+        }));
+        dialog.appendSingleButton(UiOptionItem.from("Disable host · keep last-good pool", option -> {
+            config.edit().remove("endpoint").apply();
+            dialog.closeDialog();
+        }));
+        dialog.showDialog("Discover private host · shared pool, account-local feedback");
     }
+
+    private static void refresh(Context context) { BrowsePresenter.instance(context).refresh(false); }
 }

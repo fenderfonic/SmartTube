@@ -1,0 +1,20 @@
+{
+  "Engineering": ["water clocks", "pneumatic post", "tide mills", "rope making", "dry stone walls", "mechanical integrators", "ice harvesting", "canal locks"],
+  "History": ["Indus weights", "Swahili trading cities", "Andean quipu", "medieval water rights", "Mali manuscript libraries", "Polynesian navigation", "ancient glass trade", "postal history"],
+  "Music": ["mbira tuning", "gamelan acoustics", "Hardanger fiddle", "overtone singing", "glass harmonica", "musical automata", "Aeolian harps", "rhythm notation"],
+  "Science": ["cloud chambers", "triboluminescence", "granular convection", "ferrofluids", "sonoluminescence", "soap film experiments", "ice crystal growth", "fluid instabilities"],
+  "Craft": ["Korean paper making", "lost wax casting", "bark cloth", "marquetry", "natural indigo dye", "bookbinding", "lime plaster", "damascening"],
+  "Language": ["Nushu script", "whistled languages", "tactile alphabets", "sign language poetry", "rongorongo", "Linear B decipherment", "Inuit place names", "drum languages"],
+  "Architecture": ["windcatchers", "stepwells", "earthen mosques", "floating villages", "sod houses", "corbelled domes", "rock cut churches", "passive cooling"],
+  "Mathematics": ["aperiodic tilings", "knot invariants", "graph colouring", "spherical geometry", "mechanical linkages", "continued fractions", "topological surfaces", "nomograms"],
+  "Geography": ["endorheic lakes", "river capture", "karst landscapes", "loess plateaus", "isostatic rebound", "salt diapirs", "paleochannels", "volcanic islands"],
+  "Space": ["stellar spectroscopy", "lunar cartography", "gravity assists", "solar sailing", "radio interferometry", "occultation astronomy", "meteorite classification", "spacecraft thermal control"],
+  "Biology": ["lichen symbiosis", "electric fish", "slime mould navigation", "seed dispersal", "cave ecosystems", "mangrove roots", "insect flight", "tardigrade ecology"],
+  "Computing": ["core rope memory", "analogue computing", "mercury delay lines", "Jacquard looms", "cellular automata", "error correcting codes", "mechanical calculators", "packet switching history"],
+  "Art": ["cyanotype printing", "pigment archaeology", "camera obscura", "shadow puppetry", "encaustic painting", "mosaic conservation", "woodblock printing", "anamorphosis"],
+  "Food": ["koji fermentation", "nixtamalization", "qanat agriculture", "seaweed cultivation", "terrace farming", "ancient grain storage", "olive press archaeology", "sourdough ecology"],
+  "Ocean": ["hydrothermal vents", "underwater acoustics", "kelp forests", "tidal bores", "seagrass meadows", "marine snow", "shipwreck dendrochronology", "ocean sediment cores"],
+  "Transport": ["funicular railways", "outrigger canoes", "sail aerodynamics", "suspension bridges", "ice boats", "human powered flight", "pack animal routes", "cable ferries"],
+  "Culture": ["string figures", "oral cartography", "board game archaeology", "community seed libraries", "textile storytelling", "calendar traditions", "public bath history", "museum object biographies"],
+  "Connections": ["astronomy and weaving", "music and number theory", "fungi and building materials", "geology and pigment making", "navigation and bird migration", "origami and engineering", "archaeology and pollen", "language and landscape"]
+}

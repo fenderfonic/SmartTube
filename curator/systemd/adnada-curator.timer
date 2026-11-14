@@ -1,0 +1,8 @@
+[Unit]
+Description=Rotate adnada Discover every six London hours
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:00:00 Europe/London
+Persistent=true
+Unit=adnada-curator.service
+[Install]
+WantedBy=timers.target
