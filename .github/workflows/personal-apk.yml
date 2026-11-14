@@ -1,7 +1,7 @@
 name: Personal Android TV test APK
 on:
   pull_request:
-    branches: [master]
+    branches: [master, feat/discover-self-drive, feat/discover-v2, feat/adnada-branding-assets, feat/adnada-upstream-32-75]
   push:
     branches: [master]
   workflow_dispatch:
@@ -23,8 +23,20 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: gradle
-      - name: Validate local signing setup script
-        run: bash -n scripts/setup-adnada-signing.sh
+      - name: Verify Discover curator
+        run: python3 -m unittest discover -s curator/tests -v
+      - name: Verify Discover Android selection and cache
+        run: bash gradlew --no-daemon :common:testStbetaDebugUnitTest --tests '*Discovery*Test'
+      - name: Upload Discover Android test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: discover-tests-${{ github.run_number }}
+          path: |
+            common/build/reports/tests/testStbetaDebugUnitTest/
+            common/build/test-results/testStbetaDebugUnitTest/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Build test APK
         run: |
           chmod +x gradlew
@@ -38,6 +50,7 @@ jobs:
           AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
           "$AAPT" dump badging "$APK" | grep -F "package: name='dev.fenderfonic.smarttube'"
+          "$AAPT" dump badging "$APK" | grep -F "application-label:'adnada'"
           "$APKSIGNER" verify --print-certs "$APK"
           sha256sum "$APK"
       - name: Upload universal test APK

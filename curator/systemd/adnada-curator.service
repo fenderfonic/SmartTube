@@ -1,0 +1,9 @@
+[Unit]
+Description=Compile adnada Discover pool
+[Service]
+Type=oneshot
+WorkingDirectory=%h/adnada-discover/SmartTube/curator
+ExecStart=/usr/bin/python3 curator.py --directory %h/.local/state/adnada-discover --config %h/.config/adnada-discover/config.json
+EnvironmentFile=-%h/.config/adnada-discover/environment
+UMask=0077
+NoNewPrivileges=true

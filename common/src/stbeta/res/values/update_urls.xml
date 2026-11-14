@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Personal APK: no upstream update feed. -->
-    <string-array name="update_urls" />
+    <!-- Updates are our signed releases, never the upstream SmartTube APK. -->
+    <string-array name="update_urls">
+        <item>https://github.com/fenderfonic/SmartTube/releases/download/adnada-current/adnada-update.json</item>
+    </string-array>
 </resources>

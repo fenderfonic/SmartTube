@@ -1,0 +1,66 @@
+name: Check upstream SmartTube releases
+on:
+  schedule:
+    - cron: '20 8 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: adnada-upstream-sync
+  cancel-in-progress: false
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout adnada source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: true
+      - name: Check and prepare latest upstream beta
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          current=$(tr -d '[:space:]' < .github/adnada-upstream-version)
+          latest=$(gh api 'repos/yuliskov/SmartTube/releases?per_page=30' \
+            --jq '.[] | select(.tag_name | test("^[0-9]+\\.[0-9]+$")) | .tag_name' \
+            | sort -V | tail -n1)
+          test -n "$latest"
+          echo "Pinned: $current, upstream: $latest"
+          if [[ "$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -n1)" == "$current" ]]; then
+            echo "Already current (or upstream not newer)"
+            exit 0
+          fi
+          branch="sync/smarttube-$latest"
+          if gh pr list -R "$GITHUB_REPOSITORY" --head "$branch" --state open --json number --jq 'length' | grep -qx '[1-9][0-9]*'; then
+            echo "Upstream PR already exists: $branch"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git remote add upstream https://github.com/yuliskov/SmartTube.git
+          git fetch --no-tags upstream "refs/tags/$current:refs/tags/adnada-base-$current" \
+            "refs/tags/$latest:refs/tags/adnada-next-$latest"
+          git switch -c "$branch"
+          git diff --binary "refs/tags/adnada-base-$current" "refs/tags/adnada-next-$latest" > /tmp/adnada-upstream.patch
+          if ! git apply --3way /tmp/adnada-upstream.patch; then
+            echo "::error::Upstream patch conflicts with our fork; fix manually. No production update published."
+            git status --short
+            exit 1
+          fi
+          printf '%s\n' "$latest" > .github/adnada-upstream-version
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No content changed; release version marker already up to date"
+            exit 0
+          fi
+          git commit -m "Sync upstream SmartTube $latest"
+          git push -u origin "$branch"
+          gh pr create -R "$GITHUB_REPOSITORY" --base master --head "$branch" \
+            --title "Sync upstream SmartTube $latest" \
+            --body "Automated upstream beta update from **$current** to **$latest**. Includes source and submodule gitlink changes, preserving adnada customisations via git apply --3way. Review CI and test playback before merging and publishing a signed release. Source: https://github.com/yuliskov/SmartTube/releases/tag/$latest"

@@ -71,3 +71,10 @@ tmp/
 fabric.properties
 *BAK.java
 hs_err_pid*.log
+
+# Private Discover runtime state and Python bytecode
+__pycache__/
+*.pyc
+curator/runtime/
+curator/config.json
+curator/environment

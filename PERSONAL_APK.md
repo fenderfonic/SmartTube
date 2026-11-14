@@ -1,71 +1,48 @@
-# SmartTube Personal
+# adnada — personal Fire Stick player
 
-Independent Android TV build of SmartTube using the `stbeta` flavour.
+Fork of SmartTube with Discover. Application ID: `dev.fenderfonic.smarttube`, label: **adnada**. Upstream version pinned in `.github/adnada-upstream-version`.
 
-- Android application ID: `dev.fenderfonic.smarttube`, allowing side-by-side installation.
-- TV launcher name: **SmartTube Personal**.
-- Upstream in-app update feed disabled. Install updates only from our own APK artifacts.
-- No changes to playback or SponsorBlock functionality.
+## Development APKs
 
-## Test build
+The **Personal Android TV test APK** workflow builds an unsigned-for-release/test APK with an ephemeral CI debug signing key. Test APKs often require uninstall/reinstall and are **not eligible for in-app upgrades**. Never publish these as an update.
 
-The **Personal Android TV test APK** workflow generates a sideloadable universal APK artifact. On GitHub, open Actions, select a successful run, then download **smarttube-personal-test** from Artifacts. Unzip and sideload on a test Android TV.
+## Normal in-app updates
 
-This *test* APK is signed with an ephemeral Android debug key on the CI runner. Future runs may not update it in place. Do not rely on test signing for production use.
+SmartTube's existing updater is enabled for adnada and reads **only**:
 
-## Permanent signing
+https://github.com/fenderfonic/SmartTube/releases/download/adnada-current/adnada-update.json
 
-**One-time Mac setup (recommended).** The private signing keystore must live
-outside Git and outside this chat. The reviewed helper creates it on the Mac,
-uploads four encrypted repository secrets through an authenticated GitHub CLI,
-and prints only the public certificate fingerprint.
+The **Publish adnada update** workflow builds a signed universal APK, validates package and signature, and uploads `adnada-universal.apk` plus `adnada-update.json` to the fixed `adnada-current` GitHub Release. The updater checks version codes and offers to install newer builds, preserving app data.
 
-Prerequisites: JDK (`keytool`) and GitHub CLI (`gh` authenticated as the
-repository owner). On macOS, install `gh` with `brew install gh`, then
-`gh auth login` if needed. Review the helper script before running it:
+**One-time setup (Mac or Linux, no JDK required on Mac):**
 
 ```sh
-curl -fsSLo "$HOME/Downloads/setup-adnada-signing.sh" \
-  https://raw.githubusercontent.com/fenderfonic/SmartTube/master/scripts/setup-adnada-signing.sh
-less "$HOME/Downloads/setup-adnada-signing.sh"
-bash "$HOME/Downloads/setup-adnada-signing.sh"
+bash <(curl -fsSL https://raw.githubusercontent.com/fenderfonic/SmartTube/master/scripts/bootstrap-adnada-signing.sh)
 ```
 
-The script will interactively prompt for a new keystore password and **reuse
-an existing key rather than replace it**. Private key:
-`~/.config/adnada/adnada-release.p12`. Keep a protected offline backup
-and a securely stored copy of the password. Losing the key prevents normal
-upgrades to already-installed releases. The GitHub Actions secrets are:
+This creates `~/.config/adnada/adnada-release.p12` and `signing-pass.txt` with private permissions and configures the four GitHub Actions secrets using existing `gh` authentication. **Back up both private files securely.** Never commit, upload to a chat or regenerate the keystore after shipping. The bootstrap can be rerun to re-upload the existing identity.
 
-- `SMARTTUBE_KEYSTORE_BASE64`: base64-encoded private keystore
-- `SMARTTUBE_STORE_PASSWORD`: private keystore password
-- `SMARTTUBE_KEY_ALIAS`: `adnada`
-- `SMARTTUBE_KEY_PASSWORD`: same password (PKCS12)
+Once secrets are configured, dispatch **Publish adnada update** on `master`:
 
-Do not paste any secret into chat, source control, a PR or issue.
+```sh
+gh workflow run adnada-publish.yml -R fenderfonic/SmartTube --ref master
+```
 
-**Run a signed build:** GitHub Actions → **Personal Android TV signed
-release** → **Run workflow**, and select `feat/discover-self-drive` to
-build Discover (or `master` for the unchanged baseline). The workflow
-exists on default branch `master` and accepts the selected branch as its
-source. Download the resulting signed *universal APK* under Artifacts;
-validate the selected branch and signer before sideloading.
+The **first permanently signed release requires a clean uninstall of any prior CI debug build** because Android disallows upgrading across different signing identities. Every subsequent release with the same key can update **in place** via the app's own updater.
 
-**Existing test installation:** the first real Fire Stick APK is debug-signed
-with a CI-runner key, not this permanent one. Android will reject an upgrade
-signed by a different key (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). Review
-or record app settings before uninstalling the test APK. Uninstalling will
-normally erase app-local preferences, sign-in and cached data. To make the
-one-time switch, uninstall the old package only **after** the new signed APK
-has been built and verified, then install the signed APK with ADB. Future
-signed releases using the same key should be eligible for in-place upgrades
-when Android version codes permit.
+To install the initial signed release from the Mac (only after the workflow successfully publishes):
 
-Do not assume `adb backup` can reliably preserve app data across a signing
-identity change. The old working installation is left untouched by these
-GitHub build instructions.
-## Review and testing
+```sh
+curl -fL -o /tmp/adnada-universal.apk https://github.com/fenderfonic/SmartTube/releases/download/adnada-current/adnada-universal.apk
+adb connect 192.168.0.214:5555
+adb -s 192.168.0.214:5555 uninstall dev.fenderfonic.smarttube
+adb -s 192.168.0.214:5555 install /tmp/adnada-universal.apk
+```
 
-First confirm CI succeeds, then test remote navigation, playback, ad behaviour, SponsorBlock, search, and optionally login and casting. Review every upstream dependency and submodule change before updating; an independent signature alone does not establish source safety. YouTube may disrupt third-party clients. Retain the MIT licence and upstream copyright notices.
+Thereafter open adnada normally. Check the update notification or use the built-in manual check.
+
+## Upstream sync
+
+**Check upstream SmartTube releases** runs daily via GitHub Actions, compares current pinned release against the latest upstream beta and creates a reviewable pull request if a 3-way patch applies. Merge conflicts fail the check: no silent overwrite, no auto-merge or auto-release. After CI and playback acceptance, merge the PR and run the publisher to make the update available in the app.
 
 Source: https://github.com/yuliskov/SmartTube
