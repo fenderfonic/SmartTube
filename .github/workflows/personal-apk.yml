@@ -23,6 +23,8 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: gradle
+      - name: Validate local signing setup script
+        run: bash -n scripts/setup-adnada-signing.sh
       - name: Build test APK
         run: |
           chmod +x gradlew
