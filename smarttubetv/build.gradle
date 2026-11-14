@@ -38,8 +38,9 @@ android {
         applicationId "app.smarttube"
         minSdkVersion project.properties.minSdkVersion
         targetSdkVersion project.properties.targetSdkVersion
-        versionCode 2465
-        versionName "32.75"
+        // Signed GitHub releases can override these without changing development builds.
+        versionCode (project.findProperty("adnadaVersionCode")?.toString()?.toInteger() ?: 2465)
+        versionName (project.findProperty("adnadaVersionName")?.toString() ?: "32.75")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "long", "TIMESTAMP", System.currentTimeMillis() + "L"
 
