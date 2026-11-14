@@ -16,6 +16,20 @@ for program in keytool gh base64 tr; do
   fi
 done
 
+# macOS provides /usr/bin/keytool as a stub even with no JDK installed.
+# Prefer the Homebrew JDK when available, and fail before asking for a password.
+if ! keytool -help >/dev/null 2>&1 && command -v brew >/dev/null 2>&1; then
+  BREW_JDK="$(brew --prefix openjdk@17 2>/dev/null || true)"
+  if [[ -n "$BREW_JDK" && -x "$BREW_JDK/bin/keytool" ]]; then
+    export PATH="$BREW_JDK/bin:$PATH"
+  fi
+fi
+if ! keytool -help >/dev/null 2>&1; then
+  echo "Java JDK not available. On macOS: brew install openjdk@17" >&2
+  echo "Then rerun this script. Java is checked before prompting for passwords." >&2
+  exit 1
+fi
+
 if ! gh auth status >/dev/null 2>&1; then
   echo "GitHub CLI is not logged in. Run: gh auth login" >&2
   exit 1
