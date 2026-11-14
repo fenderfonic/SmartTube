@@ -1,0 +1,114 @@
+name: Publish adnada update
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: adnada-publish
+  cancel-in-progress: false
+jobs:
+  signed-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout source and playback submodules
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Set up Java 17
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Prepare permanent signing identity
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SMARTTUBE_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.SMARTTUBE_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SMARTTUBE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.SMARTTUBE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$KEYSTORE_BASE64" || -z "$STORE_PASSWORD" || -z "$KEY_ALIAS" || -z "$KEY_PASSWORD" ]]; then
+            echo "::error::Run scripts/bootstrap-adnada-signing.sh once to configure signing secrets"
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/adnada-release.p12"
+          {
+            printf 'storeFile=%s\n' "$GITHUB_WORKSPACE/adnada-release.p12"
+            printf 'storePassword=%s\n' "$STORE_PASSWORD"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+          } > keystore.properties
+      - name: Build updateable universal APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon :smarttubetv:assembleStbetaRelease \
+            -PadnadaVersionCode="$((500000 + GITHUB_RUN_NUMBER))" \
+            -PadnadaVersionName="adnada.${GITHUB_RUN_NUMBER}"
+      - name: Verify signed identity and prepare manifest
+        shell: bash
+        env:
+          UPDATE_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          apk=$(find smarttubetv/build/outputs/apk/stbeta/release -name '*_universal.apk' -type f -print -quit)
+          test -n "$apk" && test -s "$apk"
+          aapt=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)
+          apksigner=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
+          "$aapt" dump badging "$apk" | grep -F "package: name='dev.fenderfonic.smarttube'"
+          "$aapt" dump badging "$apk" | grep -F "application-label:'adnada'"
+          "$apksigner" verify --print-certs "$apk"
+          sha256sum "$apk"
+          mkdir -p publish
+          cp "$apk" publish/adnada-universal.apk
+          python3 - <<'PY'
+          import json, os
+          run = int(os.environ['UPDATE_VERSION_CODE'])
+          version = f'adnada.{run}'
+          payload = {
+              'package': {
+                  'downloadUrl': 'https://github.com/fenderfonic/SmartTube/releases/download/adnada-current/adnada-universal.apk'
+              },
+              version: {
+                  'versionCode': 500000 + run,
+                  'changelog': ['Updated adnada player and Discover (GitHub build %s)' % run]
+              }
+          }
+          with open('publish/adnada-update.json', 'w') as f:
+              json.dump(payload, f, indent=2)
+              f.write('\n')
+          PY
+          python3 -m json.tool publish/adnada-update.json >/dev/null
+      - name: Publish APK and native SmartTube update feed
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh release view adnada-current -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create adnada-current -R "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --title "adnada current" \
+              --notes "Latest signed adnada APK for in-app updates. Do not mix with upstream SmartTube APKs."
+          fi
+          gh release upload adnada-current -R "$GITHUB_REPOSITORY" \
+            publish/adnada-universal.apk --clobber
+          gh release upload adnada-current -R "$GITHUB_REPOSITORY" \
+            publish/adnada-update.json --clobber
+          gh release edit adnada-current -R "$GITHUB_REPOSITORY" \
+            --notes "Current signed adnada build ${GITHUB_RUN_NUMBER}, source ${GITHUB_SHA}. Updates are offered by the built-in SmartTube checker."
+      - name: Retain signed APK for diagnostics
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: adnada-signed-${{ github.run_number }}
+          path: publish/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Clean up signing material
+        if: always()
+        run: rm -f adnada-release.p12 keystore.properties
