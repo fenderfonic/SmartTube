@@ -1,7 +1,7 @@
 name: Personal Android TV test APK
 on:
   pull_request:
-    branches: [master, feat/discover-self-drive, feat/discover-v2]
+    branches: [master, feat/discover-self-drive, feat/discover-v2, feat/adnada-branding-assets]
   push:
     branches: [master]
   workflow_dispatch:
