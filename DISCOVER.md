@@ -11,7 +11,8 @@ feedback upload. No YouTube OAuth or playlist changes.
 `curator/catalogue.json` contains 144 concrete subjects across 18 families. Six editorial
 search lenses and six geographical search lenses yield **5,184 unique query directions**.
 The standard-library Python compiler rotates a deterministic 216-entry page every six
-London hours, with round-robin subject diversity, stable SHA-256 seeds and deduplication.
+London hours, with round-robin subject/region diversity, stable SHA-256 seeds and deduplication.
+Every baseline subject has two queries per region so combined Focus has material.
 The default pool has no repeated exact query across eight consecutive slots (two days).
 A finite catalogue eventually cycles; similar subjects can recur with different lenses.
 Edit the catalogue to add real new subjects; it is deliberately easy to throw away.

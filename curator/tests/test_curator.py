@@ -28,6 +28,8 @@ class PoolTests(unittest.TestCase):
             self.assertFalse(seen & queries)
             self.assertEqual(18, len({e['topic'] for e in pool['entries']}))
             self.assertEqual(6, len({e['region'] for e in pool['entries']}))
+            for topic in CAT:
+                self.assertEqual(6, len({e['region'] for e in pool['entries'] if e['topic'] == topic}))
             seen |= queries
         self.assertNotEqual(first, curator.generate(CAT, NOW, seed='other'))
 

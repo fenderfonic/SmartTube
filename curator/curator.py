@@ -75,11 +75,23 @@ def generate(catalogue, now, seed='adnada-v2', size=216, extra=()):
     ordered_topics = topics[slot % len(topics):] + topics[:slot % len(topics)]
     pages = {}
     for topic in ordered_topics:
-        ordered = sorted(grouped[topic].values(), key=lambda i: hashlib.sha256(
-            (seed + i['id']).encode()).digest())
+        by_region = {}
+        for item in grouped[topic].values():
+            by_region.setdefault(item['region'], []).append(item)
+        regions = sorted(by_region)
         per_topic = (size + len(topics) - 1) // len(topics)
-        offset = (slot * per_topic) % len(ordered)
-        pages[topic] = ordered[offset:] + ordered[:offset]
+        per_region = (per_topic + len(regions) - 1) // len(regions)
+        regional_pages = {}
+        for region in regions:
+            ordered = sorted(by_region[region], key=lambda i: hashlib.sha256(
+                (seed + i['id']).encode()).digest())
+            offset = (slot * per_region) % len(ordered)
+            regional_pages[region] = ordered[offset:] + ordered[:offset]
+        pages[topic] = []
+        for row in range(max(map(len, regional_pages.values()))):
+            for region in regions:
+                if row < len(regional_pages[region]):
+                    pages[topic].append(regional_pages[region][row])
     # Round robin subjects, allowing small novelty categories without duplicate padding.
     for row in range(max(map(len, pages.values()))):
         for topic in ordered_topics:
