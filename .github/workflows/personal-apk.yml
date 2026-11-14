@@ -1,7 +1,7 @@
 name: Personal Android TV test APK
 on:
   pull_request:
-    branches: [master, feat/discover-self-drive]
+    branches: [master, feat/discover-self-drive, feat/discover-v2]
   push:
     branches: [master]
   workflow_dispatch:
@@ -50,6 +50,7 @@ jobs:
           AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
           "$AAPT" dump badging "$APK" | grep -F "package: name='dev.fenderfonic.smarttube'"
+          "$AAPT" dump badging "$APK" | grep -F "application-label:'adnada'"
           "$APKSIGNER" verify --print-certs "$APK"
           sha256sum "$APK"
       - name: Upload universal test APK
