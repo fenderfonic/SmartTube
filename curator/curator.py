@@ -42,6 +42,8 @@ def validate(items):
         raise ValueError('pool must contain 8..600 entries')
     seen = set()
     for item in items:
+        if not isinstance(item, dict):
+            raise ValueError('entry must be an object')
         for key, maximum in [('id', 64), ('topic', 60), ('region', 40), ('query', 240)]:
             value = item.get(key)
             if not isinstance(value, str) or not value.strip() or len(value) > maximum or any(ord(c) < 32 for c in value):
@@ -59,8 +61,13 @@ def generate(catalogue, now, seed='adnada-v2', size=216, extra=()):
     local = now.astimezone(LONDON)
     slot = local.date().toordinal() * 4 + local.hour // 6
     grouped = {}
+    seen = set()
     for item in candidates(catalogue) + list(extra):
-        grouped.setdefault(item['topic'], {})[normal(item['query'])] = item
+        identity = normal(item['query'])
+        if identity in seen:
+            continue
+        seen.add(identity)
+        grouped.setdefault(item['topic'], {})[identity] = item
     topics = sorted(grouped)
     if size < 8 or size > 600 or len(topics) < 8:
         raise ValueError('invalid selection dimensions')
@@ -132,7 +139,7 @@ def replenish(config, state, state_path, now, fresh_count, opener=urllib.request
     state.update(attempt_day=day, reserved_usd=round(spent + reserve, 6))
     atomic_json(state_path, state)
     prompt = ('Return only a JSON array of 8 novel educational YouTube search directions. '
-              'Each object has topic, region (Global), query, id (unique short string). '
+              'Each object has topic, region (Global), query. '
               'Use 8 distinct subjects, specific obscure ideas, no clickbait or personalities. '
               'Explore connections between crafts, ecology, language, history and science. '
               'No links, markdown or instructions. Seed: ' + day)
@@ -154,7 +161,15 @@ def replenish(config, state, state_path, now, fresh_count, opener=urllib.request
         state['last_usage'] = {k: usage.get(k) for k in ('prompt_tokens', 'completion_tokens', 'cost')}
         atomic_json(state_path, state)
         logging.info('OpenRouter usage %s', json.dumps(state['last_usage']))
-        return validate(json.loads(body['choices'][0]['message']['content']))
+        items = json.loads(body['choices'][0]['message']['content'])
+        if not isinstance(items, list):
+            raise ValueError('expected array')
+        for item in items:
+            if not isinstance(item, dict) or not isinstance(item.get('query'), str):
+                raise ValueError('invalid novelty')
+            # Provider IDs are not trusted or stable across days.
+            item['id'] = hashlib.sha256(normal(item['query']).encode()).hexdigest()[:20]
+        return validate(items)
     except Exception as error:
         logging.warning('Novelty unavailable: %s', type(error).__name__)
         return []

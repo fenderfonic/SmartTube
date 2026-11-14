@@ -5,7 +5,6 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-import threading
 import unittest
 from unittest.mock import patch
 
@@ -107,6 +106,34 @@ class PoolTests(unittest.TestCase):
                 self.assertEqual([], curator.replenish(dict(daily_calls=1, model='test'), state,
                     path, NOW, 0, lambda *a, **k: Response()))
             self.assertEqual(0.0001, json.loads(path.read_text())['last_usage']['cost'])
+
+    def test_llm_valid_novelty_has_canonical_ids_and_replays(self):
+        items = [dict(topic=f'Novel topic {n}', region='Global', query=f'Obscure process {n} lecture')
+                 for n in range(8)]
+        class Response:
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def read(self, limit):
+                return json.dumps(dict(usage=dict(prompt_tokens=100, completion_tokens=200, cost=0.00025),
+                    choices=[dict(message=dict(content=json.dumps(items)))])).encode()
+        with tempfile.TemporaryDirectory() as folder:
+            state = {}
+            with patch.dict(os.environ, {'OPENROUTER_API_KEY': 'test'}):
+                result = curator.replenish(dict(daily_calls=1, model='test'), state,
+                    Path(folder) / 'state.json', NOW, 0, lambda *a, **k: Response())
+            self.assertEqual(8, len(result))
+            self.assertEqual(8, len({i['id'] for i in result}))
+            for item in result:
+                self.assertEqual(curator.hashlib.sha256(curator.normal(item['query']).encode()).hexdigest()[:20], item['id'])
+            self.assertEqual(curator.generate(CAT, NOW, extra=result),
+                             curator.generate(CAT, NOW, extra=json.loads(json.dumps(result))))
+
+    def test_cross_topic_dedup_and_malformed_items(self):
+        item = curator.candidates(CAT)[0]
+        duplicate = dict(item, topic='Other topic', id='provider-chosen-id')
+        curator.validate(curator.generate(CAT, NOW, extra=[duplicate])['entries'])
+        with self.assertRaises(ValueError):
+            curator.validate(['not an object'] * 8)
 
     def test_private_read_only_server_exposes_only_pool(self):
         self.assertFalse(serve.private_address('0.0.0.0'))
