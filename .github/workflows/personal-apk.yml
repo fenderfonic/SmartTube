@@ -27,6 +27,16 @@ jobs:
         run: python3 -m unittest discover -s curator/tests -v
       - name: Verify Discover Android selection and cache
         run: bash gradlew --no-daemon :common:testStbetaDebugUnitTest --tests '*Discovery*Test'
+      - name: Upload Discover Android test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: discover-tests-${{ github.run_number }}
+          path: |
+            common/build/reports/tests/testStbetaDebugUnitTest/
+            common/build/test-results/testStbetaDebugUnitTest/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Build test APK
         run: |
           chmod +x gradlew
