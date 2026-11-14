@@ -49,6 +49,13 @@ public class AppUpdatePresenter extends BasePresenter<Void> implements AppUpdate
     }
 
     public void start(boolean forceCheck) {
+        // No update feed: updates are installed from our own signed APKs.
+        if (mUpdateManifestUrls.length == 0) {
+            if (forceCheck) {
+                MessageHelpers.showMessage(getContext(), R.string.update_not_found);
+            }
+            return;
+        }
         mIsForceCheck = forceCheck;
 
         if (forceCheck) {
