@@ -28,7 +28,10 @@ public final class DiscoverPresenter {
     private DiscoverPresenter() {}
 
     static String accountKey() {
-        Account a = MediaServiceManager.instance().getSelectedAccount();
+        return accountKey(MediaServiceManager.instance().getSelectedAccount());
+    }
+
+    static String accountKey(Account a) {
         if (a == null || a.isEmpty()) return "anonymous";
         try {
             String identity = a.getId() + "\n" + a.getEmail() + "\n" + a.getName();
@@ -37,7 +40,7 @@ public final class DiscoverPresenter {
         } catch (Exception error) { throw new IllegalStateException(error); }
     }
 
-    private static SharedPreferences prefs(Context context, String account) {
+    static SharedPreferences prefs(Context context, String account) {
         return context.getSharedPreferences("adnada_discover_v2_" + account, Context.MODE_PRIVATE);
     }
 
