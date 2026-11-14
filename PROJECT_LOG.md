@@ -34,3 +34,12 @@ The related private project `fenderfonic/asmr` may later provide same-device in-
 ## Engineering principles
 
 GitHub source of truth; prefer Codex and PR review for code. KISS, no code packages. Avoid security claims from fork status alone. Review upstream source changes, submodule hashes, dependencies and update behaviours. No live app/TV changes without the owner's go-ahead. A test artifact's ephemeral debug key is **not** a production signing identity. Do not commit signing keys or passwords.
+
+## Experiment: Discover (13 November 2026)
+
+- [Draft PR #2](https://github.com/fenderfonic/SmartTube/pull/2), stacked on PR #1, adds a native sidebar **Discover** section.
+- It provides eight broad exploratory searches, Pivot for variety, explicit 👍/👎 topic feedback and local short-term prompt-repeat suppression. Watch history and clicks are not inferred as preferences. No new TV UI or player changes.
+- First cut deliberately uses a curated query bank, not a remote LLM. Dynamic prompts via private Ubuntu + OpenRouter can be evaluated once the TV UX is accepted.
+- [Android APK build #43490997667](https://github.com/fenderfonic/SmartTube/actions/runs/43490997667) **passed**; artifact `smarttube-personal-test-5` uploaded. This is CI acceptance only, not Fire Stick acceptance.
+- **Do not blindly upgrade the working original test APK**: test builds are debug-signed with ephemeral CI keys. Future in-place upgrades require a permanent signing key; a reinstall may erase the app's local data.
+- Owner acceptance pending: Discover sidebar placement, prompt -> YouTube search -> playback, back navigation, Pivot, feedback and reset behaviour.
